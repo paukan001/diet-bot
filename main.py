@@ -9,8 +9,8 @@ from openai import OpenAI
 # 1. НАСТРОЙКИ БОТА
 # ============================================================
 
-TOKEN = ""
-DEEPSEEK_API_KEY = ""
+TOKEN = "BOT_TOKEN"
+DEEPSEEK_API_KEY = "DEEPSEEK_API_KEY"
 
 bot = telebot.TeleBot(TOKEN)
 users_data = {}
