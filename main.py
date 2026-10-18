@@ -8,6 +8,7 @@ from openai import OpenAI
 # ============================================================
 # 1. НАСТРОЙКИ БОТА
 # ============================================================
+import os
 
 TOKEN = "BOT_TOKEN"
 DEEPSEEK_API_KEY = "DEEPSEEK_API_KEY"
