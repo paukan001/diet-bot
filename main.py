@@ -10,8 +10,8 @@ from openai import OpenAI
 # ============================================================
 import os
 
-TOKEN = "BOT_TOKEN"
-DEEPSEEK_API_KEY = "DEEPSEEK_API_KEY"
+TOKEN = os.environ.get('BOT_TOKEN')
+DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY')
 
 bot = telebot.TeleBot(TOKEN)
 users_data = {}
