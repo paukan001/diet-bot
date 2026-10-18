@@ -34,7 +34,7 @@ def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add(
         types.KeyboardButton("📋 Меню на день"),
-        types.KeyboardButton("📅 Меню на semana")
+        types.KeyboardButton("📅 Меню на неделю")
     )
     markup.add(
         types.KeyboardButton("🔍 Случайный рецепт"),
