@@ -49,12 +49,12 @@ def get_main_keyboard():
         types.KeyboardButton("ℹ️ О диете")
     )
     markup.add(
-        types.KeyboardButton("🍳 Завтрак"),
+        types.KeyboardButton(" Завтрак"),
         types.KeyboardButton("🍲 Обед")
     )
     markup.add(
-        types.KeyboardButton("🌙 Ужин"),
-        types.KeyboardButton("🍎 Перекус")
+        types.KeyboardButton(" Ужин"),
+        types.KeyboardButton(" Перекус")
     )
     return markup
 
@@ -64,7 +64,6 @@ def get_main_keyboard():
 def load_recipes(filename='recipes.csv'):
     recipes = []
     try:
-        # ВАЖНО: На серверах используется utf-8. Убедись, что твой CSV сохранен в UTF-8
         with open(filename, mode='r', encoding='utf-8') as file:
             reader = csv.DictReader(file, delimiter=';')
             for row in reader:
@@ -122,7 +121,7 @@ def ask_deepseek_for_recipe(ingredients_text):
                 {"role": "user", "content": f"У меня есть: {ingredients_text}. Что приготовить по Столу №5?"}
             ],
             temperature=0.7,
-            timeout=30 # Защита от зависания запроса к API
+            timeout=30
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -158,26 +157,27 @@ def categorize_ingredient(ingredient):
     if any(w in ing for w in ['яблоко', 'банан', 'киви', 'груша', 'апельсин', 'ягоды']): return '🍎 Фрукты и ягоды'
     if any(w in ing for w in ['куриц', 'индейк', 'говядин', 'фарш', 'печень']): return '🍗 Мясо и птица'
     if any(w in ing for w in ['рыб', 'хек', 'треск', 'лосось', 'судак', 'форель', 'креветк']): return '🐟 Рыба и морепродукты'
-    if any(w in ing for w in ['творог', 'молоко', 'кефир', 'йогурт', 'сыр', 'сливк', 'сметана']): return '🥛 Молочные продукты'
+    if any(w in ing for w in ['творог', 'молоко', 'кефир', 'йогурт', 'сыр', 'сливк', 'сметана']): return ' Молочные продукты'
     if 'яйц' in ing or 'яйцо' in ing: return '🥚 Яйца'
     if any(w in ing for w in ['овсян', 'гречк', 'рис', 'булгур', 'пшен', 'вермишел', 'макарон']): return '🌾 Крупы и злаки'
     if any(w in ing for w in ['хлеб', 'тост', 'хлебец']): return '🍞 Хлеб и выпечка'
     if any(w in ing for w in ['масло', 'оливков', 'сливочн']): return '🫙 Масла и жиры'
-    if any(w in ing for w in ['орех', 'миндаль', 'кешью', 'семен', 'чиа', 'лён', 'кунжут']): return '🥜 Орехи и семена'
+    if any(w in ing for w in ['орех', 'миндаль', 'кешью', 'семен', 'чиа', 'лён', 'кунжут']): return ' Орехи и семена'
     if any(w in ing for w in ['томат', 'соус', 'бульон', 'желатин', 'крахмал', 'мука', 'сахар', 'корица', 'соль', 'перец', 'лимон']): return '🧂 Бакалея и специи'
-    return '📦 Другое'
+    return ' Другое'
 
-def generate_weekly_shopping_list():
-    days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+# НОВАЯ ФУНКЦИЯ: генерация списка покупок из УЖЕ СОЗДАННОГО меню
+def generate_shopping_list_from_menu(weekly_menu):
     all_ingredients = []
-    for day in days:
-        menu = generate_daily_menu()
+    
+    for day, menu in weekly_menu.items():
         if menu:
             for recipe in menu.values():
                 if recipe and 'Ингредиенты' in recipe and recipe['Ингредиенты']:
                     all_ingredients.extend([i.strip() for i in recipe['Ингредиенты'].split(';') if i.strip()])
 
-    if not all_ingredients: return None, None
+    if not all_ingredients: 
+        return None
 
     categorized = {}
     for ing in all_ingredients:
@@ -190,11 +190,12 @@ def generate_weekly_shopping_list():
         for ing in sorted(set(categorized[cat])):
             shopping_list += f"  • {ing}\n"
         shopping_list += "\n"
-    return shopping_list, None # Упростил возврат, weekly_menu не использовался
+    return shopping_list
 
+# ИСПРАВЛЕННАЯ ФУНКЦИЯ: теперь с памятью о меню
 def get_user_data(user_id):
     if user_id not in users_data:
-        users_data[user_id] = {'name': None, 'start_date': None}
+        users_data[user_id] = {'name': None, 'start_date': None, 'weekly_menu': None}
     return users_data[user_id]
 
 # ============================================================
@@ -231,12 +232,22 @@ def send_daily_menu(message):
     msg += f"\n🔥 *Итого:* {total_cal} ккал"
     bot.send_message(message.chat.id, msg, reply_markup=get_main_keyboard(), parse_mode='Markdown')
 
+# ИСПРАВЛЕННАЯ ФУНКЦИЯ: меню сохраняется в память пользователя
 @bot.message_handler(commands=['week'])
 def send_weekly_menu(message):
+    user_data = get_user_data(message.from_user.id)
     days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
-    msg = "📅 *Меню на неделю:*\n\n"
+    
+    # Генерируем меню ОДИН раз и сохраняем его
+    weekly_menu = {}
     for day in days:
-        menu = generate_daily_menu()
+        weekly_menu[day] = generate_daily_menu()
+    
+    user_data['weekly_menu'] = weekly_menu  # <-- ключевое исправление
+
+    msg = " *Меню на неделю:*\n\n"
+    for day in days:
+        menu = weekly_menu[day]
         if menu:
             msg += f"*{day}:*\n"
             for meal, recipe in menu.items():
@@ -244,13 +255,25 @@ def send_weekly_menu(message):
             msg += "\n"
     bot.send_message(message.chat.id, msg, reply_markup=get_main_keyboard(), parse_mode='Markdown')
 
+# ИСПРАВЛЕННАЯ ФУНКЦИЯ: список покупок берется из сохраненного меню
 @bot.message_handler(commands=['shopping'])
 def send_shopping_list_only(message):
-    bot.reply_to(message, "⏳ Собираю список покупок...", reply_markup=get_main_keyboard())
-    shopping_list, _ = generate_weekly_shopping_list()
+    user_data = get_user_data(message.from_user.id)
+    
+    # Если меню еще не создавали — создаем в фоне
+    if not user_data.get('weekly_menu'):
+        bot.reply_to(message, "⏳ Сначала сгенерирую меню, а потом соберу список...", reply_markup=get_main_keyboard())
+        days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+        weekly_menu = {day: generate_daily_menu() for day in days}
+        user_data['weekly_menu'] = weekly_menu
+
+    # Берем ТО САМОЕ сохраненное меню
+    shopping_list = generate_shopping_list_from_menu(user_data['weekly_menu'])
+    
     if not shopping_list:
         bot.send_message(message.chat.id, "😕 Не удалось сформировать список. Проверь базу рецептов.", reply_markup=get_main_keyboard())
         return
+        
     bot.send_message(message.chat.id, shopping_list, reply_markup=get_main_keyboard(), parse_mode='Markdown')
 
 @bot.message_handler(commands=['recipe'])
@@ -271,7 +294,7 @@ def send_progress(message):
         days = (datetime.now() - user_data['start_date']).days + 1
         msg = f"📊 *Твой прогресс:*\nТы на диете уже *{days} дн.*\n"
         if days < 7: msg += "💪 Первая неделя — самая важная!"
-        elif days < 14: msg += "🔥 Отлично! Печень начинает восстанавливаться!"
+        elif days < 14: msg += " Отлично! Печень начинает восстанавливаться!"
         else: msg += "⭐ Ты уже в ритме! Так держать!"
     else:
         msg = "📊 Нажми /start, чтобы начать отсчет!"
@@ -311,7 +334,7 @@ def handle_text(message):
     elif text in ["🍎 Перекус", "Перекус"]:
         recipes = get_recipes_by_meal('Перекус')
         bot.send_message(message.chat.id, format_recipe(random.choice(recipes)) if recipes else "😕 Нет рецептов", reply_markup=get_main_keyboard(), parse_mode='Markdown')
-    elif text in ["🤖 ИИ-помощник", "ИИ-помощник"]:
+    elif text in [" ИИ-помощник", "ИИ-помощник"]:
         user_states[user_id] = 'waiting_for_ingredients'
         bot.send_message(message.chat.id, "🤖 *ИИ-помощник активирован!*\n\nНапиши продукты (например: 'курица, кабачок, рис'), и я придумаю рецепт для Стола №5!", reply_markup=get_main_keyboard(), parse_mode='Markdown')
     else:
@@ -326,9 +349,9 @@ def handle_text(message):
 # ============================================================
 if __name__ == '__main__':
     print("🚀 Бот запускается...")
-    print(f"📚 Рецептов в базе: {len(all_recipes)}")
+    print(f" Рецептов в базе: {len(all_recipes)}")
     if TOKEN and DEEPSEEK_API_KEY:
         print("✅ Ключи загружены. Подключаемся к Telegram и DeepSeek...")
-        bot.infinity_polling(timeout=60) # timeout=60 критически важен для стабильности на сервере
+        bot.infinity_polling(timeout=60)
     else:
         print("❌ Запуск прерван: отсутствуют переменные окружения.")
